@@ -44,6 +44,8 @@ class LLMAnalyzer:
 3. **Discussion Quality**: Constructive vs destructive patterns, evidence usage, respectful discourse
 4. **Reasoning Errors**: Hasty generalizations, circular reasoning, etc.
 
+IMPORTANT: Respond in the SAME LANGUAGE as the original text being analyzed.
+
 Respond in JSON format with the following structure:
 {
     "has_biases": boolean,

@@ -24,16 +24,22 @@ def check_python_version():
 def check_dependencies():
     """Check if required packages are installed."""
     required_packages = [
-        "telegram", "openai", "python-dotenv", 
-        "pydantic", "rich", "loguru", "aiohttp"
+        ("telegram", "python-telegram-bot"), 
+        ("openai", "openai"), 
+        ("dotenv", "python-dotenv"),
+        ("pydantic", "pydantic"), 
+        ("pydantic_settings", "pydantic-settings"),
+        ("rich", "rich"), 
+        ("loguru", "loguru"), 
+        ("aiohttp", "aiohttp")
     ]
     
     missing = []
-    for package in required_packages:
+    for import_name, package_name in required_packages:
         try:
-            __import__(package.replace("-", "_"))
+            __import__(import_name)
         except ImportError:
-            missing.append(package)
+            missing.append(package_name)
     
     if missing:
         print(f"❌ Missing packages: {', '.join(missing)}")
@@ -94,7 +100,23 @@ def main():
     try:
         from cognibot import main as bot_main
         import asyncio
-        asyncio.run(bot_main())
+        
+        # Auto-restart on code changes in development
+        if os.getenv("COGNIBOT_DEV_MODE", "false").lower() == "true":
+            print("🔄 Development mode: Auto-restart enabled")
+            import time
+            while True:
+                try:
+                    asyncio.run(bot_main())
+                except KeyboardInterrupt:
+                    print("\n🛑 Bot stopped by user")
+                    break
+                except Exception as e:
+                    print(f"\n❌ Bot crashed: {e}")
+                    print("🔄 Restarting in 5 seconds...")
+                    time.sleep(5)
+        else:
+            asyncio.run(bot_main())
     except KeyboardInterrupt:
         print("\n🛑 Bot stopped by user")
     except Exception as e:

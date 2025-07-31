@@ -3,11 +3,12 @@
 # Copy this file to .env and fill in your actual values
 
 # Telegram Bot Configuration
-TELEGRAM_BOT_TOKEN=7969263316:AAGDUtcrUuA_bgTVqbppdajUWouYsI9eLAQ
-TELEGRAM_CHANNEL_ID=@biascheck_bot
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+TELEGRAM_CHANNEL_ID=@your_channel_username_or_id
+TELEGRAM_CHANNELS=@channel1,@channel2,@channel3
 
 # OpenAI Configuration
-OPENAI_API_KEY=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
+OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_MODEL=gpt-4o-mini
 
 # Bot Configuration

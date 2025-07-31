@@ -148,13 +148,39 @@ I'm here to foster better discourse, not to criticize!
         """Handle incoming messages from monitored channels."""
         message = update.message
         
+        # Skip if no message or no text
+        if not message or not message.text:
+            return
+        
         # Skip if message already processed
         if message.message_id in self.processed_messages:
             return
         
-        # Skip if not from monitored channel (if specified)
-        if settings.telegram_channel_id and str(message.chat.id) != settings.telegram_channel_id.replace('@', ''):
-            return
+        # Debug: Log channel info
+        logger.info(f"Message from chat ID: {message.chat.id}, chat title: {message.chat.title}, chat username: {getattr(message.chat, 'username', None)}")
+        
+        # Skip if not from monitored channel(s) (if specified)
+        if settings.telegram_channel_id or settings.telegram_channels:
+            # Get list of monitored channels
+            monitored_channels = []
+            if settings.telegram_channel_id:
+                monitored_channels.append(settings.telegram_channel_id.replace('@', ''))
+            if settings.telegram_channels:
+                additional_channels = [ch.strip().replace('@', '') for ch in settings.telegram_channels.split(',') if ch.strip()]
+                monitored_channels.extend(additional_channels)
+            
+            chat_id_str = str(message.chat.id)
+            chat_username = getattr(message.chat, 'username', None)
+            
+            # Check if message is from any monitored channel (by ID or username)
+            is_monitored_channel = any(
+                chat_id_str == channel or chat_username == channel
+                for channel in monitored_channels
+            )
+            
+            if not is_monitored_channel:
+                logger.info(f"Skipping message - not from monitored channels. Expected: {monitored_channels}, Got chat ID: {message.chat.id}, username: {chat_username}")
+                return
         
         # Skip very short messages
         if len(message.text) < 50:

@@ -9,7 +9,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 import os
 from typing import Optional
 from dotenv import load_dotenv
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 load_dotenv()
 
@@ -19,6 +20,7 @@ class Settings(BaseSettings):
     # Telegram settings
     telegram_bot_token: str = Field(..., env="TELEGRAM_BOT_TOKEN")
     telegram_channel_id: str = Field(..., env="TELEGRAM_CHANNEL_ID")
+    telegram_channels: str = Field(default="", env="TELEGRAM_CHANNELS")  # Comma-separated list
     
     # OpenAI settings
     openai_api_key: str = Field(..., env="OPENAI_API_KEY")
