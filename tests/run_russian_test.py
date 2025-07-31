@@ -22,11 +22,11 @@ async def test_russian_sentence():
     # The Russian sentence (logical fallacy: affirming the consequent)
     russian_text = "Всякая селедка рыба, значит всякая рыба - селедка"
     
-    print("🧠 Testing Russian Logical Fallacy")
+    print("🧠 Testing Russian Multilingual Analysis")
     print("="*60)
-    print(f"📝 Text: {russian_text}")
-    print(f"🔍 Translation: 'Every herring is a fish, therefore every fish is a herring'")
-    print(f"⚠️  Expected: Logical fallacy (affirming the consequent)")
+    print(f"📝 Russian Text: {russian_text}")
+    print(f"🎯 Testing: LLM should analyze AND respond in Russian")
+    print(f"⚠️  Expected: Logical fallacy detection in Russian")
     print("\n" + "="*60)
     
     # Test 1: Pattern-based detection
@@ -60,6 +60,10 @@ async def test_russian_sentence():
         print(f"   Detected biases: {', '.join(llm_result.detected_biases)}")
         print(f"   Reasoning quality: {llm_result.reasoning_quality}")
         print(f"   Summary: {llm_result.summary}")
+        
+        # Check if response is in Russian (contains Cyrillic characters)
+        has_cyrillic = any('\u0400' <= char <= '\u04FF' for char in llm_result.summary)
+        print(f"   🌍 Response in Russian: {'✅ Yes' if has_cyrillic else '❌ No (English detected)'}")
         
         # Test the formatted response (what users would see)
         print(f"\n📋 Bot Response Preview:")
