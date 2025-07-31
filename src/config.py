@@ -19,8 +19,7 @@ class Settings(BaseSettings):
     
     # Telegram settings
     telegram_bot_token: str = Field(..., env="TELEGRAM_BOT_TOKEN")
-    telegram_channel_id: str = Field(..., env="TELEGRAM_CHANNEL_ID")
-    telegram_channels: str = Field(default="", env="TELEGRAM_CHANNELS")  # Comma-separated list
+    telegram_channels: str = Field(..., env="TELEGRAM_CHANNELS")  # Comma-separated list of channels to monitor
     
     # OpenAI settings
     openai_api_key: str = Field(..., env="OPENAI_API_KEY")

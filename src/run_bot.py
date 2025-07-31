@@ -62,7 +62,7 @@ def check_configuration():
     from dotenv import load_dotenv
     load_dotenv()
     
-    required_vars = ["TELEGRAM_BOT_TOKEN", "OPENAI_API_KEY", "TELEGRAM_CHANNEL_ID"]
+    required_vars = ["TELEGRAM_BOT_TOKEN", "OPENAI_API_KEY", "TELEGRAM_CHANNELS"]
     missing_vars = []
     
     for var in required_vars:

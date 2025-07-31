@@ -135,7 +135,7 @@ I'm here to foster better discourse, not to criticize!
 • **Messages processed:** {len(self.processed_messages)}
 • **Active since:** Bot startup
 • **Analysis threshold:** {settings.analysis_threshold}
-• **Channel monitoring:** {settings.telegram_channel_id}
+• **Channel monitoring:** {settings.telegram_channels}
 
 **Bias Detection:**
 • Pattern-based detection active
@@ -160,14 +160,13 @@ I'm here to foster better discourse, not to criticize!
         logger.info(f"Message from chat ID: {message.chat.id}, chat title: {message.chat.title}, chat username: {getattr(message.chat, 'username', None)}")
         
         # Skip if not from monitored channel(s) (if specified)
-        if settings.telegram_channel_id or settings.telegram_channels:
-            # Get list of monitored channels
-            monitored_channels = []
-            if settings.telegram_channel_id:
-                monitored_channels.append(settings.telegram_channel_id.replace('@', ''))
-            if settings.telegram_channels:
-                additional_channels = [ch.strip().replace('@', '') for ch in settings.telegram_channels.split(',') if ch.strip()]
-                monitored_channels.extend(additional_channels)
+        if settings.telegram_channels:
+            # Get list of monitored channels from comma-separated list
+            monitored_channels = [
+                ch.strip().replace('@', '') 
+                for ch in settings.telegram_channels.split(',') 
+                if ch.strip()
+            ]
             
             chat_id_str = str(message.chat.id)
             chat_username = getattr(message.chat, 'username', None)
@@ -284,7 +283,7 @@ I'm here to foster better discourse, not to criticize!
         await self.application.start()
         await self.application.updater.start_polling()
         
-        logger.info(f"Bot is running and monitoring channel: {settings.telegram_channel_id}")
+        logger.info(f"Bot is running and monitoring channels: {settings.telegram_channels}")
         
         try:
             # Keep the bot running
