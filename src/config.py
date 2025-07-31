@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     
     # OpenAI settings
     openai_api_key: str = Field(..., env="OPENAI_API_KEY")
-    openai_model: str = Field(default="gpt-4-turbo-preview", env="OPENAI_MODEL")
+    openai_model: str = Field(default="gpt-4o-mini", env="OPENAI_MODEL")
     
     # Bot behavior settings
     analysis_threshold: float = Field(default=0.7, env="ANALYSIS_THRESHOLD")
