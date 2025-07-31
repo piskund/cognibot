@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for CogniBot analysis functions.
+Legacy test script for CogniBot analysis functions.
 Run this to verify the bias detection and LLM analysis are working correctly.
 
 Copyright (c) 2025 Dmytro Piskun <dmytro.piskun@gmail.com>
@@ -9,6 +9,13 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 """
 
 import asyncio
+import sys
+from pathlib import Path
+
+# Add src directory to Python path for imports
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root / "src"))
+
 from bias_detector import BiasDetector
 from llm_analyzer import LLMAnalyzer
 

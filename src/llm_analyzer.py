@@ -13,9 +13,20 @@ from openai import AsyncOpenAI
 from dataclasses import dataclass
 import json
 from loguru import logger
+from enum import Enum
 
 from config import settings
 from bias_detector import BiasAnalysis, BiasType
+
+
+class APIErrorType(Enum):
+    """Types of API errors that can occur."""
+    INVALID_API_KEY = "invalid_api_key"
+    RATE_LIMITED = "rate_limited"
+    NETWORK_ERROR = "network_error"
+    SERVICE_UNAVAILABLE = "service_unavailable"
+    INSUFFICIENT_QUOTA = "insufficient_quota"
+    UNKNOWN_ERROR = "unknown_error"
 
 @dataclass
 class LLMAnalysisResult:
@@ -27,6 +38,8 @@ class LLMAnalysisResult:
     discussion_issues: List[str]
     suggestions: List[str]
     summary: str
+    api_error: Optional[APIErrorType] = None
+    error_message: Optional[str] = None
 
 class LLMAnalyzer:
     """Uses LLM to analyze text for cognitive biases and logical errors."""
@@ -101,21 +114,58 @@ Be constructive and educational in your analysis."""
             
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse LLM response: {e}")
-            return self._create_fallback_result(text)
+            return self._create_fallback_result(text, APIErrorType.UNKNOWN_ERROR, "Failed to parse API response")
+        except openai.AuthenticationError as e:
+            logger.error(f"OpenAI authentication failed: {e}")
+            return self._create_fallback_result(text, APIErrorType.INVALID_API_KEY, "Invalid or expired OpenAI API key")
+        except openai.RateLimitError as e:
+            logger.error(f"OpenAI rate limit exceeded: {e}")
+            return self._create_fallback_result(text, APIErrorType.RATE_LIMITED, "API rate limit exceeded - too many requests")
+        except openai.InternalServerError as e:
+            logger.error(f"OpenAI service error: {e}")
+            return self._create_fallback_result(text, APIErrorType.SERVICE_UNAVAILABLE, "OpenAI service temporarily unavailable")
+        except openai.APIConnectionError as e:
+            logger.error(f"OpenAI connection failed: {e}")
+            return self._create_fallback_result(text, APIErrorType.NETWORK_ERROR, "Network connection to OpenAI failed")
+        except openai.BadRequestError as e:
+            if "quota" in str(e).lower() or "billing" in str(e).lower():
+                logger.error(f"OpenAI quota exceeded: {e}")
+                return self._create_fallback_result(text, APIErrorType.INSUFFICIENT_QUOTA, "OpenAI API quota exceeded")
+            else:
+                logger.error(f"OpenAI bad request: {e}")
+                return self._create_fallback_result(text, APIErrorType.UNKNOWN_ERROR, f"API request error: {str(e)}")
         except Exception as e:
             logger.error(f"LLM analysis failed: {e}")
-            return self._create_fallback_result(text)
+            return self._create_fallback_result(text, APIErrorType.UNKNOWN_ERROR, f"Unexpected error: {str(e)}")
     
-    def _create_fallback_result(self, text: str) -> LLMAnalysisResult:
+    def _create_fallback_result(self, text: str, error_type: APIErrorType, error_message: str) -> LLMAnalysisResult:
         """Create a fallback result when LLM analysis fails."""
+        
+        # Customize suggestions based on error type
+        suggestions = []
+        if error_type == APIErrorType.INVALID_API_KEY:
+            suggestions = ["OpenAI API key is invalid or expired - please check configuration"]
+        elif error_type == APIErrorType.RATE_LIMITED:
+            suggestions = ["API rate limit exceeded - analysis will resume shortly"]
+        elif error_type == APIErrorType.INSUFFICIENT_QUOTA:
+            suggestions = ["OpenAI quota exceeded - please check billing and usage limits"]
+        elif error_type == APIErrorType.NETWORK_ERROR:
+            suggestions = ["Network connection issue - please check internet connectivity"]
+        elif error_type == APIErrorType.SERVICE_UNAVAILABLE:
+            suggestions = ["OpenAI service temporarily unavailable - please try again later"]
+        else:
+            suggestions = ["LLM analysis temporarily unavailable due to technical issues"]
+        
         return LLMAnalysisResult(
             has_biases=False,
             confidence=0.0,
             detected_biases=[],
             reasoning_quality="unknown",
             discussion_issues=[],
-            suggestions=["Unable to analyze due to technical issues"],
-            summary="Analysis could not be completed."
+            suggestions=suggestions,
+            summary="Analysis could not be completed due to technical issues.",
+            api_error=error_type,
+            error_message=error_message
         )
     
     async def generate_educational_response(self, analysis: LLMAnalysisResult, original_text: str) -> str:
@@ -151,12 +201,35 @@ Create a response that's educational, not confrontational. Focus on helping impr
             
             return response.choices[0].message.content
             
+        except openai.AuthenticationError as e:
+            logger.error(f"OpenAI authentication failed for educational response: {e}")
+            return "⚠️ Unable to generate detailed response due to API authentication issues."
+        except openai.RateLimitError as e:
+            logger.error(f"Rate limit exceeded for educational response: {e}")
+            return "⚠️ Analysis completed but detailed response unavailable due to rate limits."
         except Exception as e:
             logger.error(f"Failed to generate educational response: {e}")
             return None
     
     def format_analysis_summary(self, analysis: LLMAnalysisResult) -> str:
-        """Format the analysis results into a readable summary."""
+        """Format analysis results into a human-readable summary."""
+        
+        # Handle API errors first
+        if analysis.api_error:
+            if analysis.api_error == APIErrorType.INVALID_API_KEY:
+                return "⚠️ **Configuration Issue**: OpenAI API key is invalid or expired. LLM analysis unavailable."
+            elif analysis.api_error == APIErrorType.RATE_LIMITED:
+                return "⏳ **Rate Limited**: Too many requests to OpenAI. Analysis will resume shortly."
+            elif analysis.api_error == APIErrorType.INSUFFICIENT_QUOTA:
+                return "💰 **Quota Exceeded**: OpenAI usage limits reached. Please check billing settings."
+            elif analysis.api_error == APIErrorType.SERVICE_UNAVAILABLE:
+                return "🔧 **Service Unavailable**: OpenAI service temporarily down. Using pattern-based analysis only."
+            elif analysis.api_error == APIErrorType.NETWORK_ERROR:
+                return "🌐 **Connection Issue**: Cannot reach OpenAI servers. Check internet connection."
+            else:
+                return f"❌ **Analysis Error**: {analysis.error_message or 'LLM analysis temporarily unavailable.'}"
+        
+        # Normal analysis results
         if not analysis.has_biases and not analysis.discussion_issues:
             return "✅ **Good Discussion Quality**: No significant cognitive biases or logical errors detected."
         
