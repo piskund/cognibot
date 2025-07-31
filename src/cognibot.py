@@ -159,8 +159,16 @@ I'm here to foster better discourse, not to criticize!
         # Debug: Log channel info
         logger.info(f"Message from chat ID: {message.chat.id}, chat title: {message.chat.title}, chat username: {getattr(message.chat, 'username', None)}")
         
+        # DEBUG: Temporarily log all channel info and accept all channels
+        logger.info(f"🔍 DEBUG: Message received from:")
+        logger.info(f"   Chat ID: {message.chat.id}")
+        logger.info(f"   Chat title: {message.chat.title}")
+        logger.info(f"   Chat username: {getattr(message.chat, 'username', None)}")
+        logger.info(f"   Chat type: {message.chat.type}")
+        logger.info(f"   Expected channels: {settings.telegram_channels}")
+        
         # Skip if not from monitored channel(s) (if specified)
-        if settings.telegram_channels:
+        if False:  # Temporarily disabled for debugging
             # Get list of monitored channels from comma-separated list
             monitored_channels = [
                 ch.strip().replace('@', '') 
@@ -181,8 +189,8 @@ I'm here to foster better discourse, not to criticize!
                 logger.info(f"Skipping message - not from monitored channels. Expected: {monitored_channels}, Got chat ID: {message.chat.id}, username: {chat_username}")
                 return
         
-        # Skip very short messages
-        if len(message.text) < 50:
+        # Skip very short messages (temporarily lowered for testing)
+        if len(message.text) < 20:
             return
         
         # Rate limiting check
