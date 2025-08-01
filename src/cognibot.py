@@ -48,11 +48,19 @@ class CogniBot:
         self.application.add_handler(CommandHandler("analyze", self.analyze_command))
         self.application.add_handler(CommandHandler("stats", self.stats_command))
         
-        # Add message handler for channel monitoring
+        # Add message handler for private/group messages
         self.application.add_handler(MessageHandler(
             filters.TEXT & ~filters.COMMAND, 
             self.handle_message
         ))
+        
+        # Add handler specifically for channel posts (when bot is admin)
+        self.application.add_handler(MessageHandler(
+            filters.UpdateType.CHANNEL_POST & filters.TEXT & ~filters.COMMAND,
+            self.handle_message
+        ))
+        
+
         
         logger.info("Bot initialized successfully")
     
@@ -146,7 +154,8 @@ I'm here to foster better discourse, not to criticize!
     
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle incoming messages from monitored channels."""
-        message = update.message
+        # Handle both regular messages and channel posts
+        message = update.message or update.channel_post
         
         # Skip if no message or no text
         if not message or not message.text:
@@ -156,19 +165,11 @@ I'm here to foster better discourse, not to criticize!
         if message.message_id in self.processed_messages:
             return
         
-        # Debug: Log channel info
-        logger.info(f"Message from chat ID: {message.chat.id}, chat title: {message.chat.title}, chat username: {getattr(message.chat, 'username', None)}")
-        
-        # DEBUG: Temporarily log all channel info and accept all channels
-        logger.info(f"🔍 DEBUG: Message received from:")
-        logger.info(f"   Chat ID: {message.chat.id}")
-        logger.info(f"   Chat title: {message.chat.title}")
-        logger.info(f"   Chat username: {getattr(message.chat, 'username', None)}")
-        logger.info(f"   Chat type: {message.chat.type}")
-        logger.info(f"   Expected channels: {settings.telegram_channels}")
+        # Log channel info for monitoring
+        logger.info(f"Message from chat: {message.chat.title} (@{getattr(message.chat, 'username', 'N/A')})")
         
         # Skip if not from monitored channel(s) (if specified)
-        if False:  # Temporarily disabled for debugging
+        if settings.telegram_channels:
             # Get list of monitored channels from comma-separated list
             monitored_channels = [
                 ch.strip().replace('@', '') 
@@ -210,28 +211,45 @@ I'm here to foster better discourse, not to criticize!
         """Analyze a message and respond if significant issues found."""
         text = message.text
         
-        logger.info(f"Analyzing message from {message.from_user.username}: {text[:100]}...")
+        # Handle username safely (channel posts don't have from_user)
+        username = getattr(message.from_user, 'username', None) if message.from_user else 'channel'
+        logger.info(f"Analyzing message from {username}: {text[:100]}...")
         
         # Run both analyses
         pattern_results = self.bias_detector.analyze_text(text)
+        total_pattern_biases = sum(len(r.detected_biases) for r in pattern_results)
+        logger.info(f"Pattern analysis completed: {total_pattern_biases} biases found in {len(pattern_results)} analyses")
+        
         llm_result = await self.llm_analyzer.analyze_message(text)
+        logger.info(f"LLM analysis completed: has_biases={llm_result.has_biases}, confidence={llm_result.confidence}")
         
         # Determine if response is warranted
         should_respond = await self._should_respond(pattern_results, llm_result)
+        logger.info(f"Should respond decision: {should_respond}")
         
         if should_respond:
-            # Format response
-            response = await self._format_analysis_response(pattern_results, llm_result)
-            
-            # Send response as reply
-            await message.reply_text(response, parse_mode='Markdown')
-            
-            # Update rate limiting
-            self.last_analysis_time[message.chat.id] = datetime.now()
-            
-            logger.info(f"Sent analysis response for message {message.message_id}")
+            try:
+                logger.info("📝 Formatting analysis response...")
+                # Format response
+                response = await self._format_analysis_response(pattern_results, llm_result)
+                logger.info(f"Response formatted: {len(response)} chars")
+                
+                logger.info("📤 Sending response to channel...")
+                # Send response as reply
+                await message.reply_text(response, parse_mode='Markdown')
+                logger.info("✅ Response sent successfully")
+                
+                # Update rate limiting
+                self.last_analysis_time[message.chat.id] = datetime.now()
+                
+                logger.info(f"✅ Sent analysis response for message {message.message_id}")
+            except Exception as e:
+                logger.error(f"❌ Failed to send response for message {message.message_id}: {e}")
+                logger.error(f"❌ Exception type: {type(e).__name__}")
+                import traceback
+                logger.error(f"❌ Traceback: {traceback.format_exc()}")
         else:
-            logger.debug(f"No significant issues found in message {message.message_id}")
+            logger.info(f"No significant issues found in message {message.message_id}")
     
     async def _should_respond(self, pattern_results: List[BiasAnalysis], llm_result: LLMAnalysisResult) -> bool:
         """Determine if the bot should respond based on analysis results."""

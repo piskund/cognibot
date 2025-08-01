@@ -50,18 +50,22 @@ class LLMAnalyzer:
     
     def _create_analysis_prompt(self) -> str:
         """Create the system prompt for bias analysis."""
-        return """You are an expert in cognitive psychology, logic, and critical thinking. Analyze the given text for:
+        return """🌍 LANGUAGE RULE #1: ALWAYS respond in the SAME LANGUAGE as the input text!
+🇷🇺 Russian input = Russian output (Cyrillic script only)
+🇺🇸 English input = English output only
+
+You are an expert in cognitive psychology, logic, and critical thinking. Analyze the given text for:
 
 1. **Cognitive Biases**: Confirmation bias, availability heuristic, anchoring bias, etc.
 2. **Logical Fallacies**: Ad hominem, strawman, false dichotomy, slippery slope, etc.
 3. **Discussion Quality**: Constructive vs destructive patterns, evidence usage, respectful discourse
 4. **Reasoning Errors**: Hasty generalizations, circular reasoning, etc.
 
-🌍 CRITICAL LANGUAGE REQUIREMENT: You MUST respond in the EXACT SAME LANGUAGE as the input text.
-- Russian input → Russian response (use Cyrillic)
-- English input → English response
-- ALL fields (biases, suggestions, summary) must be in the input language
-- Do NOT translate or mix languages
+🚨 MANDATORY: If input is Russian, ALL JSON fields must be in Russian:
+- "detected_biases": ["поспешное обобщение", "круговая логика"]
+- "suggestions": ["предоставьте конкретные примеры"]
+- "discussion_issues": ["недостаток доказательств"]
+- "reasoning_quality": "плохое|справедливое|хорошее|отличное"
 
 Respond in JSON format with the following structure:
 {
@@ -81,7 +85,7 @@ Focus on:
 - Use of evidence and sources
 - Open-mindedness vs dogmatism
 
-Be constructive and educational in your analysis."""
+🌍 REMEMBER: Match the input language exactly in ALL response fields!"""
 
     async def analyze_message(self, text: str, context: Optional[str] = None) -> LLMAnalysisResult:
         """Analyze a message using LLM for cognitive biases and discussion quality."""
@@ -91,8 +95,9 @@ Be constructive and educational in your analysis."""
             if context:
                 user_message += f"\n\nContext: {context}"
             
-            # Make API call
-            response = await self.client.chat.completions.create(
+            # Make API call with retry pattern and timeout
+            import asyncio
+            response = await self._make_api_call_with_retry(
                 model=settings.openai_model,
                 messages=[
                     {"role": "system", "content": self.analysis_prompt},
@@ -119,6 +124,9 @@ Be constructive and educational in your analysis."""
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse LLM response: {e}")
             return self._create_fallback_result(text, APIErrorType.UNKNOWN_ERROR, "Failed to parse API response")
+        except asyncio.TimeoutError:
+            logger.error("OpenAI API call timed out after 30 seconds")
+            return self._create_fallback_result(text, APIErrorType.NETWORK_ERROR, "API request timed out")
         except openai.AuthenticationError as e:
             logger.error(f"OpenAI authentication failed: {e}")
             return self._create_fallback_result(text, APIErrorType.INVALID_API_KEY, "Invalid or expired OpenAI API key")
@@ -193,7 +201,7 @@ Original message: {original_text[:500]}...
 
 Create a response that's educational, not confrontational. Focus on helping improve discourse quality."""
 
-            response = await self.client.chat.completions.create(
+            response = await self._make_api_call_with_retry(
                 model=settings.openai_model,
                 messages=[
                     {"role": "system", "content": "You are a helpful educator focused on improving critical thinking and discourse quality."},
@@ -205,14 +213,16 @@ Create a response that's educational, not confrontational. Focus on helping impr
             
             return response.choices[0].message.content
             
-        except openai.AuthenticationError as e:
-            logger.error(f"OpenAI authentication failed for educational response: {e}")
-            return "⚠️ Unable to generate detailed response due to API authentication issues."
-        except openai.RateLimitError as e:
-            logger.error(f"Rate limit exceeded for educational response: {e}")
-            return "⚠️ Analysis completed but detailed response unavailable due to rate limits."
+        except (openai.AuthenticationError, openai.RateLimitError, openai.BadRequestError) as e:
+            # These errors are passed through by the retry mechanism (non-retryable)
+            logger.error(f"OpenAI API error for educational response: {e}")
+            return "⚠️ Unable to generate detailed response due to API issues."
+        except (asyncio.TimeoutError, openai.APIConnectionError, openai.InternalServerError) as e:
+            # These errors come from retry exhaustion
+            logger.error(f"OpenAI API failed after retries for educational response: {e}")
+            return "⚠️ Service temporarily unavailable. Please try again later."
         except Exception as e:
-            logger.error(f"Failed to generate educational response: {e}")
+            logger.error(f"Unexpected error generating educational response: {e}")
             return None
     
     def format_analysis_summary(self, analysis: LLMAnalysisResult) -> str:
@@ -269,4 +279,42 @@ Create a response that's educational, not confrontational. Focus on helping impr
         if analysis.summary:
             summary_parts.append(f"\n📝 **Summary:** {analysis.summary}")
         
-        return "\n".join(summary_parts) 
+        return "\n".join(summary_parts)
+    
+    async def _make_api_call_with_retry(self, **kwargs) -> any:
+        """Make OpenAI API call with retry pattern and exponential backoff."""
+        import asyncio
+        
+        max_attempts = 3
+        base_delay = 1.0  # Start with 1 second delay
+        
+        for attempt in range(1, max_attempts + 1):
+            try:
+                logger.info(f"OpenAI API attempt {attempt}/{max_attempts}")
+                
+                # Make API call with timeout
+                response = await asyncio.wait_for(
+                    self.client.chat.completions.create(**kwargs),
+                    timeout=30.0  # 30 second timeout per attempt
+                )
+                
+                logger.info(f"OpenAI API call succeeded on attempt {attempt}")
+                return response
+                
+            except (asyncio.TimeoutError, openai.APIConnectionError, openai.InternalServerError) as e:
+                # These are retryable errors
+                if attempt == max_attempts:
+                    logger.error(f"OpenAI API failed after {max_attempts} attempts: {e}")
+                    raise  # Re-raise the last exception
+                
+                delay = base_delay * (2 ** (attempt - 1))  # Exponential backoff: 1s, 2s, 4s
+                logger.warning(f"OpenAI API attempt {attempt} failed ({type(e).__name__}), retrying in {delay}s...")
+                await asyncio.sleep(delay)
+                
+            except (openai.AuthenticationError, openai.RateLimitError, openai.BadRequestError) as e:
+                # These are non-retryable errors - fail immediately
+                logger.error(f"OpenAI API non-retryable error: {e}")
+                raise
+                
+        # This should never be reached due to the raise in the retry block
+        raise Exception("Unexpected error in retry logic") 
