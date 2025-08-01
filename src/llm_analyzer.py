@@ -57,7 +57,11 @@ class LLMAnalyzer:
 3. **Discussion Quality**: Constructive vs destructive patterns, evidence usage, respectful discourse
 4. **Reasoning Errors**: Hasty generalizations, circular reasoning, etc.
 
-IMPORTANT: Respond in the SAME LANGUAGE as the original text being analyzed.
+🌍 CRITICAL LANGUAGE REQUIREMENT: You MUST respond in the EXACT SAME LANGUAGE as the input text.
+- Russian input → Russian response (use Cyrillic)
+- English input → English response
+- ALL fields (biases, suggestions, summary) must be in the input language
+- Do NOT translate or mix languages
 
 Respond in JSON format with the following structure:
 {
