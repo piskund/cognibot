@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # Bot behavior settings
     analysis_threshold: float = Field(default=0.7, env="ANALYSIS_THRESHOLD")
     max_message_length: int = Field(default=4000, env="MAX_MESSAGE_LENGTH")
-    response_delay: int = Field(default=2, env="RESPONSE_DELAY")
+    response_delay: int = Field(default=0, env="RESPONSE_DELAY")
     
     class Config:
         env_file = ".env"

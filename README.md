@@ -113,7 +113,7 @@ python cognibot.py
 | `OPENAI_MODEL` | GPT model to use | gpt-4-turbo-preview |
 | `ANALYSIS_THRESHOLD` | Confidence threshold for responses | 0.7 |
 | `MAX_MESSAGE_LENGTH` | Maximum message length to analyze | 4000 |
-| `RESPONSE_DELAY` | Minutes between responses in same chat | 2 |
+| `RESPONSE_DELAY` | Minutes between responses in same chat | 0 |
 
 ## Detected Biases and Fallacies
 
