@@ -12,7 +12,7 @@ TELEGRAM_CHANNELS=@your_test_channel,@another_channel  # Comma-separated list of
 
 # OpenAI Configuration
 OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL=gpt-4.1-mini
 
 # Bot Configuration
 ANALYSIS_THRESHOLD=0.7

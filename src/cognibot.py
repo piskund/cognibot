@@ -140,6 +140,7 @@ I'm here to foster better discourse, not to criticize!
 
 **Commands:**
 • `/analyze <text>` - Manually analyze text
+• `/analyze` (reply to message) - Analyze the replied message
 • `/stats` - Show bot statistics
 
 **Note:** I only respond when significant issues are detected to avoid spam.
@@ -148,11 +149,46 @@ I'm here to foster better discourse, not to criticize!
     
     async def analyze_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /analyze command for manual analysis."""
-        if not context.args:
-            await update.message.reply_text("Please provide text to analyze: `/analyze Your text here`")
+        message = update.effective_message
+        if not message:
             return
         
-        text_to_analyze = " ".join(context.args)
+        text_to_analyze = ""
+        
+        # Check if this is a reply to another message
+        if message.reply_to_message and message.reply_to_message.text:
+            text_to_analyze = message.reply_to_message.text
+            logger.info(f"Manual analysis requested for replied message by {message.from_user.username or message.from_user.id}")
+        else:
+            # Get text to analyze (everything after /analyze)
+            args_text = " ".join(context.args) if context.args else ""
+            
+            # Check if the text contains a Telegram link
+            if args_text.startswith(('@https://t.me/', 'https://t.me/', '@t.me/', 't.me/')):
+                await message.reply_text(
+                    "❌ **Link Analysis Not Supported**\n\n"
+                    "Unfortunately, I cannot analyze messages from links due to Telegram Bot API limitations. "
+                    "The Bot API doesn't allow fetching arbitrary messages.\n\n"
+                    "**Alternative options:**\n"
+                    "• Reply to a message with `/analyze` to analyze it\n"
+                    "• Copy and paste the text: `/analyze [text to analyze]`",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            text_to_analyze = args_text
+        
+        if not text_to_analyze:
+            await message.reply_text(
+                "❓ **How to use /analyze:**\n\n"
+                "**Option 1:** Reply to a message with `/analyze`\n"
+                "**Option 2:** Provide text directly: `/analyze [text to analyze]`\n\n"
+                "**Example:** `/analyze This statement seems biased`",
+                parse_mode='Markdown'
+            )
+            return
+        
+        logger.info(f"Manual analysis requested by {message.from_user.username or message.from_user.id}")
         
         # Show typing indicator
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
@@ -165,11 +201,11 @@ I'm here to foster better discourse, not to criticize!
             # Format response
             response = await self._format_analysis_response(pattern_results, llm_result, manual=True)
             
-            await update.message.reply_text(response, parse_mode='Markdown')
+            await message.reply_text(response, parse_mode='Markdown')
             
         except Exception as e:
             logger.error(f"Error in manual analysis: {e}")
-            await update.message.reply_text("Sorry, analysis failed. Please try again later.")
+            await message.reply_text("Sorry, analysis failed. Please try again later.")
     
     async def stats_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /stats command."""
