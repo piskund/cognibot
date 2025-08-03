@@ -231,7 +231,7 @@ I'm here to foster better discourse, not to criticize!
             try:
                 logger.info("📝 Formatting analysis response...")
                 # Format response
-                response = await self._format_analysis_response(pattern_results, llm_result)
+                response = await self._format_analysis_response(pattern_results, llm_result, message=message)
                 logger.info(f"Response formatted: {len(response)} chars")
                 
                 logger.info("📤 Sending response to channel...")
@@ -262,7 +262,7 @@ I'm here to foster better discourse, not to criticize!
         return len(high_confidence_patterns) > 0 or llm_significant
     
     async def _format_analysis_response(self, pattern_results: List[BiasAnalysis], 
-                                      llm_result: LLMAnalysisResult, manual: bool = False) -> str:
+                                      llm_result: LLMAnalysisResult, manual: bool = False, message: Message = None) -> str:
         """Format the analysis results into a response message."""
         response_parts = []
         
@@ -288,7 +288,42 @@ I'm here to foster better discourse, not to criticize!
         if not manual:
             response_parts.append("\n💡 *This analysis aims to improve discussion quality, not to criticize. Consider this feedback constructively.*")
         
+        # Add link to original message (for automatic responses only)
+        if not manual and message:
+            message_link = self._create_message_link(message)
+            if message_link:
+                response_parts.append(f"\n🔗 [View analyzed message]({message_link})")
+        
         return "\n".join(response_parts)
+    
+    def _create_message_link(self, message: Message) -> Optional[str]:
+        """Create a link to the original message in the channel."""
+        try:
+            chat = message.chat
+            message_id = message.message_id
+            
+            # For channels and supergroups, chat_id is typically negative
+            if chat.type in ['channel', 'supergroup']:
+                if chat.username:
+                    # Public channel/supergroup with username
+                    return f"https://t.me/{chat.username}/{message_id}"
+                else:
+                    # Private channel/supergroup
+                    # Convert negative chat_id to positive for the link
+                    # For supergroups: remove -100 prefix
+                    # For channels: handle accordingly
+                    chat_id = abs(chat.id)
+                    if str(chat.id).startswith('-100'):
+                        # Remove the -100 prefix for supergroups/channels
+                        chat_id = int(str(chat.id)[4:])
+                    return f"https://t.me/c/{chat_id}/{message_id}"
+            
+            # For private chats and regular groups, we can't create public links
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to create message link: {e}")
+            return None
     
     async def _is_rate_limited(self, chat_id: int) -> bool:
         """Check if responses to this chat are rate limited."""
