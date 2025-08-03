@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     max_message_length: int = Field(default=4000, env="MAX_MESSAGE_LENGTH")
     response_delay: int = Field(default=0, env="RESPONSE_DELAY")
     
+    # Logging settings
+    log_level: str = Field(default="INFO", env="LOG_LEVEL")
+    log_to_file: bool = Field(default=False, env="LOG_TO_FILE")
+    
     class Config:
         env_file = ".env"
         case_sensitive = False

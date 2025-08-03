@@ -114,6 +114,8 @@ python cognibot.py
 | `ANALYSIS_THRESHOLD` | Confidence threshold for responses | 0.7 |
 | `MAX_MESSAGE_LENGTH` | Maximum message length to analyze | 4000 |
 | `RESPONSE_DELAY` | Minutes between responses in same chat | 0 |
+| `LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING, ERROR) | INFO |
+| `LOG_TO_FILE` | Enable logging to file | false |
 
 ## Detected Biases and Fallacies
 
@@ -179,17 +181,35 @@ For questions: [dmytro.piskun@gmail.com](mailto:dmytro.piskun@gmail.com)
 **Analysis not working:**
 - Check OpenAI API key and credits
 - Verify internet connectivity
-- Check logs in `cognibot.log`
+- Check console logs or enable file logging for detailed information
 
 **Rate limiting:**
-- Bot waits 2 minutes between responses by default
+- Bot waits between responses based on `RESPONSE_DELAY` setting
 - Adjust `RESPONSE_DELAY` if needed
+
+**Logging configuration:**
+- Set `LOG_LEVEL` to control console output verbosity:
+  - `DEBUG`: Detailed logs including analysis steps and decisions  
+  - `INFO`: Standard operational logs (default)
+  - `WARNING`: Only warnings and errors
+  - `ERROR`: Only error messages
+- Enable `LOG_TO_FILE=true` for persistent logging:
+  - Logs saved to `logs/cognibot.log`
+  - Automatic rotation (10MB files, 30-day retention)
+  - Compressed archives to save space
+  - Always logs at DEBUG level regardless of console setting
 
 ### Logs
 
-Check `cognibot.log` for detailed error information:
+**Console logs:** Always visible with level controlled by `LOG_LEVEL`
+
+**File logs:** Available when `LOG_TO_FILE=true`
 ```bash
-tail -f cognibot.log
+# View recent logs
+tail -f logs/cognibot.log
+
+# Search for errors
+grep ERROR logs/cognibot.log
 ```
 
 ## Privacy and Ethics

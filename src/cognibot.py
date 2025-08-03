@@ -9,6 +9,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 """
 
 import asyncio
+import os
 import time
 from typing import Dict, List, Optional, Set
 from datetime import datetime, timedelta
@@ -34,9 +35,44 @@ class CogniBot:
         self.application = None
         
         # Setup logging
+        self._setup_logging()
+    
+    def _setup_logging(self):
+        """Configure logging based on settings."""
+        # Remove default handlers
         logger.remove()
-        logger.add(sys.stderr, format="{time} | {level} | {message}", level="INFO")
-        logger.add("cognibot.log", rotation="1 MB", level="DEBUG")
+        
+        # Console logging with configurable level
+        log_format = "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}"
+        
+        # For DEBUG level, use more detailed format
+        if settings.log_level.upper() == "DEBUG":
+            log_format = "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} | {extra} | {message}"
+        
+        logger.add(
+            sys.stderr, 
+            format=log_format, 
+            level=settings.log_level.upper(),
+            colorize=True
+        )
+        
+        # Optional file logging
+        if settings.log_to_file:
+            # Create logs directory if it doesn't exist
+            os.makedirs("logs", exist_ok=True)
+            
+            logger.add(
+                "logs/cognibot.log", 
+                format=log_format,
+                level="DEBUG",  # Always debug level for file logs
+                rotation="10 MB",
+                retention="30 days",
+                compression="zip",
+                enqueue=True  # Make logging thread-safe
+            )
+            logger.info(f"File logging enabled: logs/cognibot.log")
+        
+        logger.info(f"Logging configured - Level: {settings.log_level.upper()}, File logging: {settings.log_to_file}")
     
     async def initialize_bot(self):
         """Initialize the Telegram bot application."""
@@ -159,14 +195,17 @@ I'm here to foster better discourse, not to criticize!
         
         # Skip if no message or no text
         if not message or not message.text:
+            logger.debug("Skipping message: no text content")
             return
         
         # Skip if message already processed
         if message.message_id in self.processed_messages:
+            logger.debug(f"Skipping already processed message {message.message_id}")
             return
         
         # Log channel info for monitoring
         logger.info(f"Message from chat: {message.chat.title} (@{getattr(message.chat, 'username', 'N/A')})")
+        logger.debug(f"Processing message {message.message_id} from chat {message.chat.id}: {message.text[:100]}...")
         
         # Skip if not from monitored channel(s) (if specified)
         if settings.telegram_channels:
@@ -196,6 +235,7 @@ I'm here to foster better discourse, not to criticize!
         
         # Rate limiting check
         if await self._is_rate_limited(message.chat.id):
+            logger.debug(f"Skipping analysis due to rate limiting for chat {message.chat.id}")
             return
         
         try:
@@ -226,6 +266,7 @@ I'm here to foster better discourse, not to criticize!
         # Determine if response is warranted
         should_respond = await self._should_respond(pattern_results, llm_result)
         logger.info(f"Should respond decision: {should_respond}")
+        logger.debug(f"Analysis details - Pattern biases: {total_pattern_biases}, LLM confidence: {llm_result.confidence}, LLM has_biases: {llm_result.has_biases}")
         
         if should_respond:
             try:
@@ -328,10 +369,13 @@ I'm here to foster better discourse, not to criticize!
     async def _is_rate_limited(self, chat_id: int) -> bool:
         """Check if responses to this chat are rate limited."""
         if chat_id not in self.last_analysis_time:
+            logger.debug(f"No previous analysis time for chat {chat_id}")
             return False
         
         time_since_last = datetime.now() - self.last_analysis_time[chat_id]
-        return time_since_last < timedelta(minutes=settings.response_delay)
+        is_limited = time_since_last < timedelta(minutes=settings.response_delay)
+        logger.debug(f"Rate limit check for chat {chat_id}: {time_since_last.total_seconds():.1f}s since last, limit: {settings.response_delay}m, limited: {is_limited}")
+        return is_limited
     
     async def run(self):
         """Run the bot."""
