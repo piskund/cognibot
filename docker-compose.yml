@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  cognibot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cognibot:latest
+    container_name: cognibot
+    restart: unless-stopped
+    
+    # Load environment variables from .env file
+    env_file:
+      - .env
+    
+    # Mount logs directory for persistence (works great with Rancher Desktop)
+    volumes:
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+    
+    # Resource limits (adjust for your Rancher Desktop setup)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    
+    # Logging configuration
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Labels for Rancher Desktop UI
+    labels:
+      - "cognibot.env=local"
+      - "cognibot.service=main"
+
+  # Development service for testing
+  cognibot-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cognibot:latest
+    container_name: cognibot-dev
+    restart: "no"
+    profiles:
+      - dev
+    
+    env_file:
+      - .env
+    
+    environment:
+      - COGNIBOT_DEV_MODE=true
+      - LOG_LEVEL=DEBUG
+    
+    volumes:
+      - ./src:/app:ro  # Read-only mount for development
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+    
+    labels:
+      - "cognibot.env=development"
+      - "cognibot.service=dev" 
